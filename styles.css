@@ -1,0 +1,239 @@
+/* =========================================================
+   Sintonía — prototipo funcional
+   Las pantallas son el diseño original (exportado del PDF).
+   Todo lo interactivo se dibuja encima, en las mismas
+   coordenadas del artboard (1920 px de ancho).
+   ========================================================= */
+
+@font-face { font-family: 'Poppins'; font-weight: 300; src: url(fonts/Poppins-Light.ttf) format('truetype'); font-display: block; }
+@font-face { font-family: 'Poppins'; font-weight: 400; src: url(fonts/Poppins-Regular.ttf) format('truetype'); font-display: block; }
+@font-face { font-family: 'Poppins'; font-weight: 500; src: url(fonts/Poppins-Medium.ttf) format('truetype'); font-display: block; }
+@font-face { font-family: 'Poppins'; font-weight: 600; src: url(fonts/Poppins-SemiBold.ttf) format('truetype'); font-display: block; }
+/* Merriweather Sans (fuente variable; el diseño usa un peso ~330 como "Regular") */
+@font-face { font-family: 'Merriweather Sans'; font-weight: 300 800; src: url(fonts/MerriweatherSans-VF.ttf) format('truetype'); font-display: block; }
+
+:root {
+  --bg: #040404;
+  --purple: #8E00D8;
+  --yellow: #FFFF00;
+  --pink: #FF2AA3;
+}
+
+html, body { margin: 0; padding: 0; background: var(--bg); }
+body { overflow-x: hidden; -webkit-font-smoothing: antialiased; }
+
+/* Artboard: 1920px de diseño escalado al ancho de la ventana */
+.app { width: 1920px; zoom: var(--z, 1); margin: 0 auto; position: relative; color: #fff; }
+
+.screen { display: none; position: relative; width: 1920px; overflow: hidden; }
+.screen.active { display: block; }
+.screen.perfil { overflow: visible; }
+.bg { display: block; user-select: none; -webkit-user-drag: none; pointer-events: none; }
+
+/* ---------- zonas clicables invisibles (botones, links, tarjetas) ---------- */
+.hs {
+  position: absolute; z-index: 2; display: block;
+  background: transparent; border: 0; margin: 0; padding: 0;
+  cursor: pointer; border-radius: 10px; -webkit-tap-highlight-color: transparent;
+}
+.hs.card { z-index: 1; border-radius: 4px; }
+.hs.round, .hs.pill { border-radius: 999px; }
+.hs:focus-visible, .ctl:focus-visible { outline: 2px solid var(--yellow); outline-offset: 3px; }
+.hs.file { overflow: hidden; }
+.hs.file input { position: absolute; inset: 0; opacity: 0; cursor: pointer; font-size: 0; }
+
+.t { position: absolute; white-space: nowrap; }
+
+/* ---------- controles: sólo se dibujan cuando su estado difiere del diseño ---------- */
+.ctl {
+  position: absolute; z-index: 3; margin: 0; padding: 0; border: 0; background: none;
+  font: inherit; color: #fff; cursor: pointer; opacity: 0; -webkit-tap-highlight-color: transparent;
+}
+.ctl.diff { opacity: 1; }
+
+/* chips / pills */
+.chip {
+  box-sizing: border-box;
+  border: var(--lw) solid var(--c); border-radius: var(--r);
+  background: var(--bg); box-shadow: 0 0 0 2px var(--bg);
+  translate: -.8px -.8px; /* compensación de muestreo frente a la imagen del diseño */
+}
+.chip span {
+  position: absolute; white-space: nowrap; transform: translateX(-50%);
+  font-weight: var(--wo); color: #fff;
+}
+.chip.fill[data-sel="1"] { background: var(--c); }
+.chip.fill[data-sel="1"] span { color: var(--on); font-weight: var(--ws); }
+.check[data-sel="1"] .lab { font-weight: 560; }
+/* subrayado del filtro del portfolio */
+.chip.ul::after { content: ''; position: absolute; left: 2px; right: 2px; top: 55px; height: 4px; background: var(--bg); }
+.chip.ul[data-sel="1"]::after { left: 4px; right: 4px; top: 56.8px; height: 1.3px; background: var(--c); }
+
+/* chips de calificación (estrellas) */
+.chip.stars svg { position: absolute; top: 11.3px; }
+.chip.stars svg path { fill: var(--c); }
+.chip.stars[data-sel="1"] svg path { fill: var(--on); }
+.chip.stars b { position: absolute; top: 6.2px; font: 400 31.14px/31.14px 'Poppins'; color: var(--c); }
+.chip.stars[data-sel="1"] b { color: var(--on); }
+
+/* checkbox y radio */
+.box i {
+  position: absolute; left: 0; top: 0; width: var(--box); height: var(--box); box-sizing: border-box;
+  border: 1.3px solid var(--c); border-radius: var(--r); background: var(--bg); box-shadow: 0 0 0 2px var(--bg);
+}
+.box i svg { position: absolute; inset: 0; width: 100%; height: 100%; display: none; }
+.box[data-sel="1"] i { background: var(--c); }
+.box[data-sel="1"] i svg { display: block; }
+.box .lab { position: absolute; white-space: nowrap; color: #fff; font-weight: 330; background: var(--bg); box-shadow: 0 0 0 4px var(--bg); }
+
+/* campos de texto: el placeholder es el del diseño; al escribir se tapa */
+.field { position: absolute; display: block; background: transparent; cursor: text; z-index: 3; }
+.field.filled { background: var(--bg); }
+.field input {
+  position: absolute; border: 0; outline: 0; background: transparent; color: #fff;
+  padding: 0; margin: 0; caret-color: var(--pink); font-weight: 330;
+}
+.field input::placeholder { color: transparent; }
+.field input[type=password] { letter-spacing: 2px; }
+.field.area textarea {
+  position: absolute; inset: 0; width: 100%; height: 100%; box-sizing: border-box; resize: none;
+  background: transparent; border: 0; outline: 0; color: #fff; caret-color: var(--pink);
+  font: 330 19px/28px 'Merriweather Sans'; padding: 16px 20px;
+}
+.fileout { font-family: 'Merriweather Sans'; font-size: 15px; font-weight: 330; }
+
+/* buscador del header */
+.hsel { display: flex; align-items: center; justify-content: center; gap: 8px; background: #FEFDFF; border-radius: 6px; }
+.hsel .v { font: 600 17px/17px 'Poppins'; color: #000; white-space: nowrap; }
+.hsel select, .sel select { position: absolute; inset: 0; width: 100%; height: 100%; opacity: 0; cursor: pointer; font-size: 16px; }
+.hsearch { position: absolute; z-index: 3; margin: 0; border-radius: 4px; }
+.hsearch.filled { background: #FEFDFF; }
+.hsearch input {
+  position: absolute; left: 5px; width: 182px; height: 30px; padding: 0; margin: 0; border: 0; outline: 0;
+  background: transparent; font: 500 13px/30px 'Poppins'; color: #111; caret-color: var(--pink);
+}
+.hsearch input::-webkit-search-cancel-button { display: none; }
+
+/* selects y fechas con texto del diseño */
+.sel .v, .date .v { position: absolute; white-space: nowrap; font: 330 19px/19px 'Merriweather Sans'; color: #fff; }
+.sel.big { background: var(--bg); } /* --bg viene en línea con el color de la barra */
+.sel.big .v { font: 400 27px/27px 'Poppins'; }
+.bigsel { position: absolute; z-index: 4; opacity: 0; cursor: pointer; font-size: 18px; }
+.date { background: var(--bg); border-radius: 7px; }
+.date input { position: absolute; left: 10px; bottom: 0; width: 1px; height: 1px; opacity: 0; pointer-events: none; border: 0; padding: 0; }
+
+/* filtros: íconos de categorías / disciplinas */
+.icon i { position: absolute; left: 0; top: 0; width: 96.2px; height: 96.2px; border-radius: 50%; overflow: hidden; background: var(--c); }
+.icon i::before {
+  content: ''; position: absolute; inset: 0;
+  background: url(assets/filtros.webp) var(--bx) var(--by) / 1920px auto no-repeat;
+  filter: grayscale(1) brightness(4) contrast(3) invert(1); mix-blend-mode: multiply;
+}
+.icon i::after { content: ''; position: absolute; inset: 0; border-radius: 50%; box-shadow: inset 0 0 0 4.5px var(--c); }
+.icon.baked-on i { background: var(--bg); }
+.icon.baked-on i::before { filter: grayscale(1) invert(1) contrast(1.8) brightness(1.1); mix-blend-mode: normal; }
+.icon .lab {
+  position: absolute; left: 48.1px; transform: translateX(-50%); text-align: center; white-space: nowrap;
+  font: 400 15px/18px 'Poppins'; color: #FEFDFF; background: var(--bg); box-shadow: 0 0 0 4px var(--bg);
+}
+.icon[data-sel="1"] .lab { font-weight: 600; }
+
+/* filtros: rubros */
+.rubro i { position: absolute; width: 22px; height: 22px; background: var(--bg); }
+.rubro i svg { display: block; transition: transform .2s ease; }
+.rubro[data-sel="1"] i svg { transform: rotate(90deg); }
+
+/* filtros: slider de presupuesto */
+.slider { position: absolute; z-index: 3; cursor: pointer; touch-action: none; }
+.slider .track { position: absolute; background: #535353; border-radius: 6px; opacity: 0; box-shadow: 0 0 0 3px var(--bg); }
+.slider .track b { position: absolute; left: 0; top: 0; bottom: 0; width: var(--p, 65%); background: var(--pink); border-radius: 6px; }
+.slider .thumb { position: absolute; left: var(--tx, 0); width: 81.2px; height: 81.3px; margin-left: -40.6px; opacity: 0; cursor: grab; }
+.slider .thumb .fl { position: absolute; inset: 0; background: url(assets/filtros.webp) no-repeat; background-size: 1920px auto;
+  -webkit-mask: radial-gradient(circle, #000 39.5px, transparent 40.5px); mask: radial-gradient(circle, #000 39.5px, transparent 40.5px); }
+.slider .cv { position: absolute; border-radius: 50%; background: var(--bg); opacity: 0; }
+.slider.diff .cv { opacity: 1; }
+.slider.diff .track, .slider.diff .thumb { opacity: 1; }
+.slider .tip {
+  position: absolute; left: 50%; bottom: 92px; transform: translateX(-50%); white-space: nowrap;
+  font: 600 22px/22px 'Poppins'; color: #040404; background: var(--yellow); padding: 8px 14px; border-radius: 999px;
+  opacity: 0; transition: opacity .15s; font-style: normal; pointer-events: none;
+}
+.slider.drag .tip { opacity: 1; }
+.slider.drag .thumb { cursor: grabbing; }
+
+/* resultados: estado hover de las tarjetas (diseño de la pantalla alterna) */
+.hovercard { position: absolute; z-index: 1; }
+.hovercard .hv { position: absolute; inset: 0; background-size: 100% 100%; opacity: 0; transition: opacity .25s ease; pointer-events: none; }
+.hovercard:hover .hv { opacity: 1; }
+
+/* trabajo: guardar */
+.save { opacity: 1; }
+.save i { position: absolute; display: block; opacity: 0; transition: opacity .15s; }
+.save i svg path { fill: var(--pink); }
+.save[data-sel="1"] i { opacity: 1; }
+
+/* mensajes */
+.conv { border-radius: 19.3px; }
+.conv:not(.first) { background: #360351; mix-blend-mode: lighten;
+  -webkit-mask: radial-gradient(circle at var(--ax) var(--ay), transparent 29.6px, #000 30.4px);
+          mask: radial-gradient(circle at var(--ax) var(--ay), transparent 29.6px, #000 30.4px); }
+.conv.first { background: var(--bg); }
+.conv.first span { position: absolute; white-space: nowrap; font-family: 'Merriweather Sans'; font-weight: 330; }
+.av { position: absolute; width: 59.9px; height: 59.9px; border-radius: 50%; background-image: url(assets/mensajes.webp); background-size: 1920px auto; }
+.chathead { position: absolute; z-index: 3; background: var(--bg); display: none; }
+.chathead.show { display: block; }
+.chathead .n, .chathead .s { position: absolute; white-space: nowrap; font-family: 'Merriweather Sans'; font-weight: 330; color: #fff; }
+.chathead .n { font-size: 24px; line-height: 24px; }
+.chathead .s { font-size: 18px; line-height: 18px; color: #d9d9d9; }
+
+.chat { position: absolute; z-index: 2; background: var(--bg); overflow-y: auto; overflow-x: hidden; overscroll-behavior: contain; scrollbar-width: thin; scrollbar-color: #5F113E transparent; }
+.chat::-webkit-scrollbar { width: 6px; }
+.chat::-webkit-scrollbar-thumb { background: #5F113E; border-radius: 3px; }
+.chat .orig { display: block; }
+.chat.other .orig { display: none; }
+.thread { padding: 0 0 26px; }
+.chat.other .thread { padding-top: 30px; }
+.msg { position: relative; margin-top: 30px; font-family: 'Merriweather Sans'; font-weight: 330; }
+.msg p {
+  margin: 0; display: inline-block; max-width: 440px; box-sizing: border-box; white-space: pre-wrap; overflow-wrap: anywhere;
+  font-size: 18px; line-height: 28px; padding: 18px 24px 17px; border-radius: 21.4px; color: #fff;
+}
+.msg time { display: block; margin-top: 11px; font-size: 14px; line-height: 14px; color: #888293; }
+.msg.in { padding-left: 99.8px; }
+.msg.in p { background: #360351; }
+.msg.in time { margin-left: 15px; }
+.msg.in .av { left: 27.7px; top: 35px; width: 53.9px; height: 53.9px; background-position: -500.7px -410.7px; }
+.msg.out { text-align: right; padding-right: 91.2px; }
+.msg.out p { background: #5F113E; text-align: left; }
+.msg.out time { margin-right: 39px; }
+.msg.out .av { right: 9.8px; top: 13.6px; width: 67.2px; height: 70.1px; border-radius: 0; background-position: -1369px -828.1px; }
+.msg.typing p { color: #cfc6d6; font-style: italic; }
+.compose { position: absolute; z-index: 3; margin: 0; border-radius: 4px; }
+.compose.filled { background: var(--bg); }
+.compose input {
+  position: absolute; left: 0; width: 100%; height: 22px; box-sizing: border-box; padding: 0; border: 0; outline: 0;
+  background: transparent; color: #fff; caret-color: var(--pink); font: 330 14px/22px 'Merriweather Sans';
+}
+
+/* perfil: columna izquierda inmóvil, derecha con scroll */
+.perfil .ph { position: relative; }
+.perfil .cols { display: flex; align-items: stretch; }
+.perfil .left { position: relative; flex: none; }
+.perfil .stick { position: sticky; top: var(--st, 10px); }
+.perfil .right { position: relative; flex: none; }
+.anchor { position: absolute; left: 0; width: 1px; height: 1px; }
+.pfgrid { position: absolute; z-index: 2; background: var(--bg); display: none; }
+.pfgrid.on { display: block; }
+.pfgrid .tile { position: absolute; display: none; background-size: 1324px auto; background-repeat: no-repeat; animation: pfin .35s ease both; }
+.pfgrid .tile.show { display: block; }
+.pfgrid .empty { display: none; position: absolute; left: 12px; top: 30px; margin: 0; font: 500 27px/40px 'Poppins'; color: #fff; }
+.pfgrid.none .empty { display: block; }
+@keyframes pfin { from { opacity: 0; transform: translateY(12px); } to { opacity: 1; transform: none; } }
+
+/* aviso */
+.toast {
+  position: fixed; left: 50%; bottom: 28px; transform: translate(-50%, 20px); z-index: 50;
+  background: var(--pink); color: #fff; font: 600 16px/1.2 'Poppins'; padding: 14px 26px; border-radius: 999px;
+  opacity: 0; pointer-events: none; transition: opacity .25s, transform .25s; box-shadow: 0 6px 24px rgba(0,0,0,.5);
+}
+.toast.show { opacity: 1; transform: translate(-50%, 0); }
